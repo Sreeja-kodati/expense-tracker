@@ -1,8 +1,9 @@
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import os
 import tempfile
+import traceback
 from receipt_parser import parse_receipt
 from database import *
 
@@ -49,22 +50,38 @@ async def upload_receipt(file: UploadFile):
             pass
 
         return saved
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON from receipt parser: {str(e)}")
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"Parsing error: {str(e)}")
     except Exception as e:
-        raise ValueError(f"Error processing receipt: {str(e)}")
+        error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @app.get("/expenses/")
 def read_expenses():
-    return get_expenses()
+    try:
+        return get_expenses()
+    except Exception as e:
+        print(f"Error reading expenses: {e}")
+        return []
 
 
 @app.put("/expenses/{expense_id}")
-def update(expense_id:str,data:dict):
-    update_expense(expense_id,data)
-    return {"message":"updated"}
+def update(expense_id:str, data:dict):
+    try:
+        update_expense(expense_id, data)
+        return {"message": "updated"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
 
 
 @app.delete("/expenses/{expense_id}")
 def delete(expense_id:str):
-    delete_expense(expense_id)
-    return {"message":"deleted"}
+    try:
+        delete_expense(expense_id)
+        return {"message": "deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")

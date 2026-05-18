@@ -6,18 +6,24 @@ DB_FILE = Path(__file__).parent / "expenses.json"
 
 
 def load_expenses():
-    if not DB_FILE.exists():
-        DB_FILE.write_text("[]", encoding="utf-8")
     try:
+        if not DB_FILE.exists():
+            DB_FILE.write_text("[]", encoding="utf-8")
         with DB_FILE.open("r", encoding="utf-8") as f:
             return json.load(f)
-    except json.JSONDecodeError:
+    except (IOError, OSError, json.JSONDecodeError) as e:
+        # Return empty list if file operations fail (e.g., on Vercel)
+        print(f"Warning: Could not load expenses: {e}")
         return []
 
 
 def save_expenses(expenses):
-    with DB_FILE.open("w", encoding="utf-8") as f:
-        json.dump(expenses, f, indent=2)
+    try:
+        with DB_FILE.open("w", encoding="utf-8") as f:
+            json.dump(expenses, f, indent=2)
+    except (IOError, OSError) as e:
+        # Fail gracefully on Vercel's read-only filesystem
+        print(f"Warning: Could not save expenses: {e}")
 
 
 def create_expense(expense):
