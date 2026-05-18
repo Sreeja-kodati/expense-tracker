@@ -1,5 +1,7 @@
-streamlit
+fastapi
+uvicorn
 google-genai
 pillow
 pandas
 plotly
+python-multipart

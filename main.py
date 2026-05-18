@@ -1,27 +1,56 @@
 from fastapi import FastAPI, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 import json
+import os
+import tempfile
 from receipt_parser import parse_receipt
 from database import *
 
 app = FastAPI()
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def root():
+    return {"status": "ok", "message": "Expense Tracker API"}
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
 @app.post("/upload-receipt/")
 async def upload_receipt(file: UploadFile):
+    try:
+        # Use temporary directory for file storage on Vercel
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
+            content = await file.read()
+            tmp.write(content)
+            tmp_path = tmp.name
 
-    path = file.filename
+        result = parse_receipt(tmp_path)
+        expenses = json.loads(result)
 
-    with open(path,"wb") as f:
-        f.write(await file.read())
+        saved=[]
 
-    result = parse_receipt(path)
-    expenses = json.loads(result)
+        for exp in expenses:
+            saved.append(create_expense(exp))
 
-    saved=[]
+        # Clean up temp file
+        try:
+            os.unlink(tmp_path)
+        except:
+            pass
 
-    for exp in expenses:
-        saved.append(create_expense(exp))
-
-    return saved
+        return saved
+    except Exception as e:
+        raise ValueError(f"Error processing receipt: {str(e)}")
 
 
 @app.get("/expenses/")
